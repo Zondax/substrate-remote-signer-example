@@ -32,10 +32,9 @@ use sp_keystore::{
 };
 use sp_application_crypto::{ed25519, sr25519, ecdsa};
 
-use futures::compat::Future01CompatExt;
 use url::Url;
 
-use crate::gen_client::Client;
+use super::RemoteSignerApiClient as Client;
 use jsonrpc_client_transports::transports::{http, ws};
 
 /// A remote based keystore that is either memory-based or filesystem-based.
@@ -82,26 +81,15 @@ impl RemoteKeystore {
 				"http" | "https" => {
 					let (sender, receiver) = futures::channel::oneshot::channel();
 					let url = self.url.clone().into_string();
-					std::thread::spawn(move || {
-						let connect = hyper::rt::lazy(move || {
-							use jsonrpc_core::futures::Future;
-							http::connect(&url)
-								.then(|client| {
-									if sender.send(client).is_err() {
-										panic!("The caller did not wait for the server.");
-									}
-									// TODO kill the tokio runtime now and the thread in case
-									// `client.is_err()`
-									Ok(())
-								})
-						});
-						hyper::rt::run(connect);
+					tokio::spawn(async move {
+						let client = http::connect(&url).await;
+						sender.send(client).map_err(|_| ()).expect("The caller did not wait for the server.");
+						Ok::<_, ()>(())
 					});
-
 					receiver.await.expect("Always sends something")
 				},
 				"ws" | "wss" => {
-					ws::connect::<Client>(&self.url).compat().await
+					ws::connect::<Client>(&self.url).await
 				},
 				_ => unreachable!()
 			};
@@ -145,7 +133,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.keys(id)
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -161,7 +148,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.supported_keys(id, keys)
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -178,7 +164,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.sign_with(id, key.clone(), msg.to_vec())
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -192,7 +177,6 @@ impl CryptoStore for RemoteKeystore {
 		match client.as_ref() {
 			Some(c) => c
 				.sr25519_public_keys(key_type)
-				.compat()
 				.await
 				.unwrap_or(vec![]),
 			_ => unreachable!()
@@ -211,7 +195,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.sr25519_generate_new(id, seed.map(|s| s.to_string()))
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -225,7 +208,6 @@ impl CryptoStore for RemoteKeystore {
 		match client.as_ref() {
 			Some(c) => c
 				.ed25519_public_keys(key_type)
-				.compat()
 				.await
 				.unwrap_or(vec![]),
 			_ => unreachable!()
@@ -244,7 +226,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.ed25519_generate_new(id, seed.map(|s| s.to_string()))
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -258,7 +239,6 @@ impl CryptoStore for RemoteKeystore {
 		match client.as_ref() {
 			Some(c) => c
 				.ecdsa_public_keys(key_type)
-				.compat()
 				.await
 				.unwrap_or(vec![]),
 			_ => unreachable!()
@@ -278,7 +258,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.ecdsa_generate_new(id, seed.map(|s| s.to_string()))
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
@@ -293,7 +272,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(())?
 			.insert_unknown(key_type, suri.to_string(), public.to_vec())
-			.compat()
 			.await
 			.map_err(|_| () )
 	}
@@ -307,7 +285,6 @@ impl CryptoStore for RemoteKeystore {
 		match client.as_ref() {
 			Some(c) => c
 				.has_keys(public_keys.to_vec())
-				.compat()
 				.await
 				.unwrap_or(false),
 			_ => false
@@ -327,7 +304,6 @@ impl CryptoStore for RemoteKeystore {
 			.as_ref()
 			.ok_or(CryptoStoreError::Unavailable)?
 			.sr25519_vrf_sign(key_type, public.clone(), transcript_data.into())
-			.compat()
 			.await
 			.map_err(|e|CryptoStoreError::Other(format!("{:}", e)) )
 	}
