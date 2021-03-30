@@ -19,7 +19,7 @@
 /// Client implementation of SSRS using hyper
 
 use async_trait::async_trait;
-use tokio::sync::RwLock;
+use tokio::{runtime::Handle, sync::RwLock};
 use std::sync::Arc;
 use sp_core::{
 	crypto::{CryptoTypePublicPair, KeyTypeId },
@@ -42,6 +42,7 @@ pub struct RemoteKeystore {
 	client: RwLock<Option<Client>>,
 	url: Url,
 	max_retry: u8,
+	rt: Handle,
 }
 
 impl RemoteKeystore {
@@ -60,6 +61,7 @@ impl RemoteKeystore {
 			client: RwLock::new(None),
 			url,
 			max_retry: max_retry.unwrap_or(10),
+			rt: Handle::current(),
 		})
 	}
 
@@ -314,7 +316,7 @@ impl SyncCryptoStore for RemoteKeystore {
 		&self,
 		id: KeyTypeId
 	) -> std::result::Result<Vec<CryptoTypePublicPair>, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::keys(self, id))
+		self.rt.block_on(CryptoStore::keys(self, id))
 	}
 
 	fn supported_keys(
@@ -322,7 +324,7 @@ impl SyncCryptoStore for RemoteKeystore {
 		id: KeyTypeId,
 		keys: Vec<CryptoTypePublicPair>
 	) -> std::result::Result<Vec<CryptoTypePublicPair>, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::supported_keys(self, id, keys))
+		self.rt.block_on(CryptoStore::supported_keys(self, id, keys))
 	}
 
 	fn sign_with(
@@ -331,11 +333,11 @@ impl SyncCryptoStore for RemoteKeystore {
 		key: &CryptoTypePublicPair,
 		msg: &[u8],
 	) -> std::result::Result<Vec<u8>, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::sign_with(self, id, key, msg))
+		self.rt.block_on(CryptoStore::sign_with(self, id, key, msg))
 	}
 
 	fn sr25519_public_keys(&self, key_type: KeyTypeId) -> Vec<sr25519::Public> {
-		futures::executor::block_on(CryptoStore::sr25519_public_keys(self, key_type))
+		self.rt.block_on(CryptoStore::sr25519_public_keys(self, key_type))
 	}
 
 	fn sr25519_generate_new(
@@ -343,11 +345,11 @@ impl SyncCryptoStore for RemoteKeystore {
 		id: KeyTypeId,
 		seed: Option<&str>,
 	) -> std::result::Result<sr25519::Public, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::sr25519_generate_new(self, id, seed))
+		self.rt.block_on(CryptoStore::sr25519_generate_new(self, id, seed))
 	}
 
 	fn ed25519_public_keys(&self, key_type: KeyTypeId) -> Vec<ed25519::Public> {
-		futures::executor::block_on(CryptoStore::ed25519_public_keys(self, key_type))
+		self.rt.block_on(CryptoStore::ed25519_public_keys(self, key_type))
 	}
 
 	fn ed25519_generate_new(
@@ -355,11 +357,11 @@ impl SyncCryptoStore for RemoteKeystore {
 		id: KeyTypeId,
 		seed: Option<&str>,
 	) -> std::result::Result<ed25519::Public, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::ed25519_generate_new(self, id, seed))
+		self.rt.block_on(CryptoStore::ed25519_generate_new(self, id, seed))
 	}
 
 	fn ecdsa_public_keys(&self, key_type: KeyTypeId) -> Vec<ecdsa::Public> {
-		futures::executor::block_on(CryptoStore::ecdsa_public_keys(self, key_type))
+		self.rt.block_on(CryptoStore::ecdsa_public_keys(self, key_type))
 	}
 
 	fn ecdsa_generate_new(
@@ -367,17 +369,17 @@ impl SyncCryptoStore for RemoteKeystore {
 		id: KeyTypeId,
 		seed: Option<&str>,
 	) -> std::result::Result<ecdsa::Public, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::ecdsa_generate_new(self, id, seed))
+		self.rt.block_on(CryptoStore::ecdsa_generate_new(self, id, seed))
 	}
 
 	fn insert_unknown(&self, key_type: KeyTypeId, suri: &str, public: &[u8])
 		-> std::result::Result<(), ()>
 	{
-		futures::executor::block_on(CryptoStore::insert_unknown(self, key_type, suri, public))
+		self.rt.block_on(CryptoStore::insert_unknown(self, key_type, suri, public))
 	}
 
 	fn has_keys(&self, public_keys: &[(Vec<u8>, KeyTypeId)]) -> bool {
-		futures::executor::block_on(CryptoStore::has_keys(self, public_keys))
+		self.rt.block_on(CryptoStore::has_keys(self, public_keys))
 	}
 
 	fn sr25519_vrf_sign(
@@ -386,7 +388,7 @@ impl SyncCryptoStore for RemoteKeystore {
 		public: &Sr25519Public,
 		transcript_data: VRFTranscriptData,
 	) -> std::result::Result<VRFSignature, CryptoStoreError> {
-		futures::executor::block_on(CryptoStore::sr25519_vrf_sign(
+		self.rt.block_on(CryptoStore::sr25519_vrf_sign(
 			self, key_type, public, transcript_data))
 	}
 }
