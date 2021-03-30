@@ -37,14 +37,14 @@ use sp_keystore::{
 	vrf::VRFTranscriptData,
 };
 
-use jsonrpc_core::{BoxFuture, Error as RpcError};
+use jsonrpc_core::{BoxFuture, Result as RpcResult, Error as RpcError};
 
 use futures::{
 	channel::{
 		oneshot,
 		mpsc::{UnboundedSender, UnboundedReceiver, unbounded},
 	},
-	future::{Future, FutureExt, TryFutureExt},
+	future::{Future, FutureExt},
 	stream:: Stream,
 };
 use std::convert::TryInto;
@@ -325,7 +325,7 @@ impl GenericRemoteSignerServer {
 	fn send_request(
 		&self,
 		request: RequestMethod
-	) ->  oneshot::Receiver<KeystoreResponse> {
+	) -> oneshot::Receiver<KeystoreResponse> {
 		let (request_sender, receiver) = oneshot::channel::<KeystoreResponse>();
 
 		let request = KeystoreRequest {
@@ -338,13 +338,14 @@ impl GenericRemoteSignerServer {
 }
 
 impl crate::RemoteSignerApi for GenericRemoteSignerServer {
-
-	fn sr25519_public_keys(&self, id: KeyTypeId) -> BoxFuture<Vec<sr25519::Public>> {
+	fn sr25519_public_keys(&self, id: KeyTypeId) -> BoxFuture<RpcResult<Vec<sr25519::Public>>> {
 		let receiver = self.send_request(RequestMethod::Sr25519PublicKeys(id));
-		Box::new(receiver.map(|e| match e {
-			Ok(KeystoreResponse::Sr25519PublicKeys(keys)) => Ok(keys),
-			_ => Ok(vec![]),
-		}).boxed().compat())
+		async move {
+			match receiver.await {
+				Ok(KeystoreResponse::Sr25519PublicKeys(keys)) => Ok(keys),
+				_ => Ok(vec![]),
+			}
+		}.boxed()
 	}
 
 
@@ -352,115 +353,116 @@ impl crate::RemoteSignerApi for GenericRemoteSignerServer {
 		&self,
 		id: KeyTypeId,
 		seed: Option<String>,
-	) -> BoxFuture<sp_application_crypto::sr25519::Public> {
-		Box::new(self.send_request(
-			RequestMethod::Sr25519GenerateNew(id, seed)
-		).map(|response|
-			if  let Ok(KeystoreResponse::Sr25519GenerateNew(result)) = response {
-				 result.map_err(|_|RpcError::internal_error())
+	) -> BoxFuture<RpcResult<sp_application_crypto::sr25519::Public>> {
+		let receiver = self.send_request(RequestMethod::Sr25519GenerateNew(id, seed));
+		async move {
+			if let Ok(KeystoreResponse::Sr25519GenerateNew(result)) = receiver.await {
+				result.map_err(|_| RpcError::internal_error())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
 	fn ed25519_public_keys(&self, id: KeyTypeId)
-		-> BoxFuture<Vec<sp_application_crypto::ed25519::Public>>
+		-> BoxFuture<RpcResult<Vec<sp_application_crypto::ed25519::Public>>>
 	{
-		Box::new(self.send_request(RequestMethod::Ed25519PublicKeys(id)).map(|response|
-			if let Ok(KeystoreResponse::Ed25519PublicKeys(keys)) = response {
+		let receiver = self.send_request(RequestMethod::Ed25519PublicKeys(id));
+		async move {
+			if let Ok(KeystoreResponse::Ed25519PublicKeys(keys)) = receiver.await {
 				Ok(keys)
 			} else {
 				Ok(vec![])
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
     fn ed25519_generate_new(
 		&self,
 		id: KeyTypeId,
 		seed: Option<String>,
-	) -> BoxFuture<sp_application_crypto::ed25519::Public> {
-		Box::new(self.send_request(
-			RequestMethod::Ed25519GenerateNew(id, seed)
-		).map(|response|
-			if let Ok(KeystoreResponse::Ed25519GenerateNew(result)) = response {
+	) -> BoxFuture<RpcResult<sp_application_crypto::ed25519::Public>> {
+		let receiver = self.send_request(RequestMethod::Ed25519GenerateNew(id, seed));
+		async move {
+			if let Ok(KeystoreResponse::Ed25519GenerateNew(result)) = receiver.await {
 				result.map_err(|_| RpcError::internal_error())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
 	fn ecdsa_public_keys(&self, id: KeyTypeId)
-		-> BoxFuture<Vec<sp_application_crypto::ecdsa::Public>>
+		-> BoxFuture<RpcResult<Vec<sp_application_crypto::ecdsa::Public>>>
 	{
-		Box::new(self.send_request(RequestMethod::EcdsaPublicKeys(id)).map(|response|
-			if let Ok(KeystoreResponse::EcdsaPublicKeys(keys)) = response
+		let receiver = self.send_request(RequestMethod::EcdsaPublicKeys(id));
+		async move {
+			if let Ok(KeystoreResponse::EcdsaPublicKeys(keys)) = receiver.await
 			{
 				Ok(keys)
 			} else {
 				Ok(vec![])
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
     fn ecdsa_generate_new(
 		&self,
 		id: KeyTypeId,
 		seed: Option<String>,
-	) -> BoxFuture<sp_application_crypto::ecdsa::Public> {
-		Box::new(self.send_request(
-			RequestMethod::EcdsaGenerateNew(id, seed)
-		).map(|response|
-			if let Ok(KeystoreResponse::EcdsaGenerateNew(result)) = response
-				 {
+	) -> BoxFuture<RpcResult<sp_application_crypto::ecdsa::Public>> {
+		let receiver = self.send_request(RequestMethod::EcdsaGenerateNew(id, seed));
+		async move{
+			if let Ok(KeystoreResponse::EcdsaGenerateNew(result)) = receiver.await {
 				result.map_err(|_| RpcError::internal_error())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
-    fn insert_unknown(&self, key_type: KeyTypeId, suri: String, public: Vec<u8>) -> BoxFuture<()> {
-		Box::new(
-			self.send_request(RequestMethod::InsertUnknown(
-					key_type, suri, public)
-			).map(|_| Ok(())).boxed().compat())
+    fn insert_unknown(&self, key_type: KeyTypeId, suri: String, public: Vec<u8>) -> BoxFuture<RpcResult<()>> {
+		let _ = self.send_request(RequestMethod::InsertUnknown(key_type, suri, public));
+		async move {
+			Ok(())
+		}.boxed()
 	}
 
     fn supported_keys(
 		&self,
 		id: KeyTypeId,
 		keys: Vec<CryptoTypePublicPair>
-	) -> BoxFuture<Vec<CryptoTypePublicPair>> {
-		Box::new(self.send_request(RequestMethod::SupportedKeys(id, keys)).map(|response|
-			if let Ok(KeystoreResponse::SupportedKeys(keys)) = response {
+	) -> BoxFuture<RpcResult<Vec<CryptoTypePublicPair>>> {
+		let receiver = self.send_request(RequestMethod::SupportedKeys(id, keys));
+		async move {
+			if let Ok(KeystoreResponse::SupportedKeys(keys)) = receiver.await {
 				keys.map_err(|_| RpcError::internal_error())
 			} else {
 				Ok(vec![])
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
-    fn keys(&self, id: KeyTypeId) -> BoxFuture<Vec<CryptoTypePublicPair>> {
-		Box::new(self.send_request(RequestMethod::Keys(id)).map(|response|
-			if let Ok(KeystoreResponse::Keys(keys)) = response {
+    fn keys(&self, id: KeyTypeId) -> BoxFuture<RpcResult<Vec<CryptoTypePublicPair>>> {
+		let receiver = self.send_request(RequestMethod::Keys(id));
+		async move {
+			if let Ok(KeystoreResponse::Keys(keys)) = receiver.await {
 				keys.map_err(|_| RpcError::internal_error())
 			} else {
 				Ok(vec![])
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
-    fn has_keys(&self, public_keys: Vec<(Vec<u8>, KeyTypeId)>) -> BoxFuture<bool> {
-		Box::new(self.send_request(RequestMethod::HasKeys(public_keys.to_vec())).map(|response|
-			if let Ok(KeystoreResponse::HasKeys(exists)) = response {
+    fn has_keys(&self, public_keys: Vec<(Vec<u8>, KeyTypeId)>) -> BoxFuture<RpcResult<bool>> {
+		let receiver = self.send_request(RequestMethod::HasKeys(public_keys.to_vec()));
+		async move {
+			if let Ok(KeystoreResponse::HasKeys(exists)) = receiver.await {
 				Ok(exists)
 			} else {
 				Ok(false)
 			}
-		).boxed().compat())
+		}.boxed()
     }
 
     fn sign_with(
@@ -468,14 +470,15 @@ impl crate::RemoteSignerApi for GenericRemoteSignerServer {
 		id: KeyTypeId,
 		key: CryptoTypePublicPair,
 		msg: Vec<u8>,
-	) -> BoxFuture<Vec<u8>> {
-		Box::new(self.send_request(RequestMethod::SignWith(id, key, msg)).map(|response|
-			if let Ok(KeystoreResponse::SignWith(result)) =  response {
+	) -> BoxFuture<RpcResult<Vec<u8>>> {
+		let receiver = self.send_request(RequestMethod::SignWith(id, key, msg));
+		async move {
+			if let Ok(KeystoreResponse::SignWith(result)) = receiver.await {
 				result.map_err(|_| RpcError::internal_error())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
 	}
 
 	fn sign_with_any(
@@ -483,14 +486,15 @@ impl crate::RemoteSignerApi for GenericRemoteSignerServer {
 		id: KeyTypeId,
 		keys: Vec<CryptoTypePublicPair>,
 		msg: Vec<u8>
-	) -> BoxFuture<(CryptoTypePublicPair, Vec<u8>)> {
-		Box::new(self.send_request(RequestMethod::SignWithAny(id, keys, msg)).map(|response|
-			if let Ok(KeystoreResponse::SignWithAny(result)) =  response {
+	) -> BoxFuture<RpcResult<(CryptoTypePublicPair, Vec<u8>)>> {
+		let receiver = self.send_request(RequestMethod::SignWithAny(id, keys, msg));
+		async move {
+			if let Ok(KeystoreResponse::SignWithAny(result)) =  receiver.await {
 				result.map_err(|_| RpcError::internal_error())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
 	}
 
 	fn sign_with_all(
@@ -498,15 +502,16 @@ impl crate::RemoteSignerApi for GenericRemoteSignerServer {
 		id: KeyTypeId,
 		keys: Vec<CryptoTypePublicPair>,
 		msg: Vec<u8>,
-	) -> BoxFuture<Vec<Result<Vec<u8>, String>>> {
-		Box::new(self.send_request(RequestMethod::SignWithAll(id, keys, msg)).map(|response|
-			if let Ok(KeystoreResponse::SignWithAll(result)) =  response {
+	) -> BoxFuture<RpcResult<Vec<Result<Vec<u8>, String>>>> {
+		let receiver = self.send_request(RequestMethod::SignWithAll(id, keys, msg));
+		async move {
+			if let Ok(KeystoreResponse::SignWithAll(result)) = receiver.await {
 				result.map_err(|_| RpcError::internal_error())
 				.map(|v| v.into_iter().map(|i| i.map_err(|e| e.to_string())).collect())
 			} else {
 				Err(RpcError::internal_error())
 			}
-		).boxed().compat())
+		}.boxed()
 	}
 
     fn sr25519_vrf_sign(
@@ -514,21 +519,20 @@ impl crate::RemoteSignerApi for GenericRemoteSignerServer {
 		key_type: KeyTypeId,
 		public: sp_application_crypto::sr25519::Public,
 		transcript_data: crate::TransferableVRFTranscriptData,
-	) -> BoxFuture<sp_keystore::vrf::VRFSignature> {
+	) -> BoxFuture<RpcResult<sp_keystore::vrf::VRFSignature>> {
 
 		match transcript_data.try_into() {
-			Ok(vrf_data) =>  Box::new(
-				self.send_request(RequestMethod::Sr25519VrfSign(key_type, public, vrf_data))
-					.map(|response|
-						if let Ok(KeystoreResponse::Sr25519VrfSign(result)) = response {
+			Ok(vrf_data) => {
+				let receiver = self.send_request(RequestMethod::Sr25519VrfSign(key_type, public, vrf_data));
+				async move {
+						if let Ok(KeystoreResponse::Sr25519VrfSign(result)) = receiver.await {
 							result.map_err(|_| RpcError::internal_error())
 						} else {
 							Err(RpcError::internal_error())
 						}
-					).boxed()
-				.compat()
-			),
-			Err(e) => Box::new(futures::future::err(RpcError::invalid_params(e)).compat())
+				}.boxed()
+			},
+			Err(e) => async move { Err(RpcError::invalid_params(e)) }.boxed(),
 		}
     }
 }
