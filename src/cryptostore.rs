@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use sp_keystore::CryptoStore;
 
 #[async_trait]
-impl CryptoStore for TEEKeystore {
+impl CryptoStore for PlayKeystore {
     async fn sr25519_public_keys(&self, id: KeyTypeId) -> Vec<sr25519::Public> {
         self.inner.sr25519_public_keys(id).await
     }

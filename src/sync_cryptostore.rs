@@ -1,7 +1,7 @@
 use super::*;
 use sp_keystore::SyncCryptoStore;
 
-impl SyncCryptoStore for TEEKeystore {
+impl SyncCryptoStore for PlayKeystore {
     fn sr25519_public_keys(&self, id: KeyTypeId) -> Vec<sr25519::Public> {
         //execute_fut(self.sr25519_public_keys_impl(id), &self.runtime)
         self.inner.sr25519_public_keys(id)
