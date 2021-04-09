@@ -1,15 +1,27 @@
 [package]
-name = "play_keystore"
+name = "tcp-keystore"
 version = "0.1.0"
 authors = ["becominginsane <francesco@zondax.ch>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bins]]
+name = "server"
+path = "bin/server.rs"
+required-features = ["server"]
+
+[features]
+server = ["sc-keystore", "async-trait", "ductile"]
+client = ["async-trait", "ductile"]
+default = ["client"]
 
 [dependencies]
 sp-core = "3.0.0"
-sc-keystore = "3.0.0"
-sp-keystore = "0.9.0"
-async-trait = "0.1.47"
+sc-keystore = { version = "3.0.0", optional = true }
+sp-keystore = { version = "0.9.0", features = ["serde"] }
+async-trait = { version = "0.1.47", optional = true }
 
 tracing = "0.1"
+
+ductile = { version = "0.1", path = "vendor/ductile", optional = true }
+serde = "1"
