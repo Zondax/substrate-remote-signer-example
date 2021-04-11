@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 #[macro_use]
 extern crate tracing;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RemoteKeystore {
     Sr25519PublicKeys(KeyTypeId),
     Sr25519GenerateNew {
@@ -52,14 +52,14 @@ pub enum RemoteKeystore {
         keys: Vec<CryptoTypePublicPair>,
         msg: Vec<u8>,
     },
-    Sr25519VrfSign {
-        key_type: KeyTypeId,
-        public: sr25519::Public,
-        transcript_data: VRFTranscriptData,
-    }
+    // Sr25519VrfSign {
+    //     key_type: KeyTypeId,
+    //     public: sr25519::Public,
+    //     transcript_data: VRFTranscriptData,
+    // }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum RemoteKeystoreResponse {
     Sr25519PublicKeys(Vec<sr25519::Public>),
     Sr25519GenerateNew(Result<sr25519::Public, Error>),
@@ -74,11 +74,11 @@ pub enum RemoteKeystoreResponse {
     SignWith(Result<Vec<u8>, Error>),
     SignWithAny(Result<(CryptoTypePublicPair, Vec<u8>), Error>),
     SignWithAll(Result<Vec<Result<Vec<u8>, Error>>, ()>),
-    Sr25519VrfSign(Result<VRFSignature, Error>)
+    // Sr25519VrfSign(Result<VRFSignature, Error>)
 }
 
 impl RemoteKeystore {
-    fn exec<K: sp_keystore::SyncCryptoStore>(self, keystore: &K) -> RemoteKeystoreResponse {
+    pub fn exec<K: sp_keystore::SyncCryptoStore>(self, keystore: &K) -> RemoteKeystoreResponse {
         use sp_keystore::SyncCryptoStore;
 
         match self {
@@ -87,7 +87,7 @@ impl RemoteKeystore {
                 RemoteKeystoreResponse::Sr25519PublicKeys(resp)
             }
             RemoteKeystore::Sr25519GenerateNew { id, seed } => {
-                let resp = SyncCryptoStore::sr25519_generate_new(keystore, id, seed.map(|s| s.as_str()));
+                let resp = SyncCryptoStore::sr25519_generate_new(keystore, id, seed.as_ref().map(|s| s.as_str()));
                 RemoteKeystoreResponse::Sr25519GenerateNew(resp)
             }
             RemoteKeystore::Ed25519PublicKeys(id) => {
@@ -95,7 +95,7 @@ impl RemoteKeystore {
                 RemoteKeystoreResponse::Ed25519PublicKeys(resp)
             }
             RemoteKeystore::Ed25519GenerateNew { id, seed } => {
-                let resp = SyncCryptoStore::ed25519_generate_new(keystore, id, seed.map(|s| s.as_str()));
+                let resp = SyncCryptoStore::ed25519_generate_new(keystore, id, seed.as_ref().map(|s| s.as_str()));
                 RemoteKeystoreResponse::Ed25519GenerateNew(resp)
             }
             RemoteKeystore::EcdsaPublicKeys(id) => {
@@ -103,7 +103,7 @@ impl RemoteKeystore {
                 RemoteKeystoreResponse::EcdsaPublicKeys(resp)
             }
             RemoteKeystore::EcdsaGenerateNew { id, seed } => {
-                let resp = SyncCryptoStore::ecdsa_generate_new(keystore, id, seed.map(|s| s.as_str()));
+                let resp = SyncCryptoStore::ecdsa_generate_new(keystore, id, seed.as_ref().map(|s| s.as_str()));
                 RemoteKeystoreResponse::EcdsaGenerateNew(resp)
             }
             RemoteKeystore::InsertUnknown { id, suri, public } => {
@@ -134,10 +134,10 @@ impl RemoteKeystore {
                 let resp = SyncCryptoStore::sign_with_all(keystore, id, keys, msg.as_slice());
                 RemoteKeystoreResponse::SignWithAll(resp)
             }
-            RemoteKeystore::Sr25519VrfSign { key_type, public, transcript_data } => {
-                let resp = SyncCryptoStore::sr25519_vrf_sign(keystore, key_type, &public, transcript_data);
-                RemoteKeystoreResponse::Sr25519VrfSign(resp)
-            }
+            // RemoteKeystore::Sr25519VrfSign { key_type, public, transcript_data } => {
+            //     let resp = SyncCryptoStore::sr25519_vrf_sign(keystore, key_type, &public, transcript_data);
+            //     RemoteKeystoreResponse::Sr25519VrfSign(resp)
+            // }
         }
     }
 }

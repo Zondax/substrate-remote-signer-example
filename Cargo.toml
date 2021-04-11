@@ -5,13 +5,13 @@ authors = ["becominginsane <francesco@zondax.ch>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[[bins]]
+[[bin]]
 name = "server"
 path = "bin/server.rs"
 required-features = ["server"]
 
 [features]
-server = ["sc-keystore", "async-trait", "ductile"]
+server = ["sc-keystore", "async-trait", "ductile", "tracing-subscriber"]
 client = ["async-trait", "ductile"]
 default = ["client"]
 
@@ -22,6 +22,12 @@ sp-keystore = { version = "0.9.0", features = ["serde"] }
 async-trait = { version = "0.1.47", optional = true }
 
 tracing = "0.1"
+tracing-subscriber = { version = "0.2.17", optional = true }
 
 ductile = { version = "0.1", path = "vendor/ductile", optional = true }
 serde = "1"
+
+[patch.crates-io]
+sp-core = { path = "../node/primitives/core" }
+sc-keystore = { path = "../node/client/keystore" }
+sp-keystore = { path = "../node/primitives/keystore" }
