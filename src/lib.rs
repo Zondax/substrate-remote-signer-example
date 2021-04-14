@@ -52,11 +52,11 @@ pub enum RemoteKeystore {
         keys: Vec<CryptoTypePublicPair>,
         msg: Vec<u8>,
     },
-    // Sr25519VrfSign {
-    //     key_type: KeyTypeId,
-    //     public: sr25519::Public,
-    //     transcript_data: VRFTranscriptData,
-    // }
+    Sr25519VrfSign {
+        key_type: KeyTypeId,
+        public: sr25519::Public,
+        transcript_data: VRFTranscriptData,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ pub enum RemoteKeystoreResponse {
     SignWith(Result<Vec<u8>, Error>),
     SignWithAny(Result<(CryptoTypePublicPair, Vec<u8>), Error>),
     SignWithAll(Result<Vec<Result<Vec<u8>, Error>>, ()>),
-    // Sr25519VrfSign(Result<VRFSignature, Error>)
+    Sr25519VrfSign(Result<VRFSignature, Error>)
 }
 
 impl RemoteKeystore {
@@ -134,10 +134,10 @@ impl RemoteKeystore {
                 let resp = SyncCryptoStore::sign_with_all(keystore, id, keys, msg.as_slice());
                 RemoteKeystoreResponse::SignWithAll(resp)
             }
-            // RemoteKeystore::Sr25519VrfSign { key_type, public, transcript_data } => {
-            //     let resp = SyncCryptoStore::sr25519_vrf_sign(keystore, key_type, &public, transcript_data);
-            //     RemoteKeystoreResponse::Sr25519VrfSign(resp)
-            // }
+            RemoteKeystore::Sr25519VrfSign { key_type, public, transcript_data } => {
+                let resp = SyncCryptoStore::sr25519_vrf_sign(keystore, key_type, &public, transcript_data);
+                RemoteKeystoreResponse::Sr25519VrfSign(resp)
+            }
         }
     }
 }

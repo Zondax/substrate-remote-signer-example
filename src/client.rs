@@ -317,32 +317,32 @@ impl Keystore {
         }
     }
 
-    // fn sr25519_vrf_sign(
-    //     &self,
-    //     key_type: KeyTypeId,
-    //     public: &sr25519::Public,
-    //     transcript_data: sp_keystore::vrf::VRFTranscriptData,
-    // ) -> Result<sp_keystore::vrf::VRFSignature, Error> {
-    //     match self.conn_tx.send(RemoteKeystore::Sr25519VrfSign {
-    //         key_type,
-    //         public: *public,
-    //         transcript_data,
-    //     }) {
-    //         Err(_) => Err(Error::Unavailable),
-    //         Ok(_) => self
-    //             .conn_rx
-    //             .recv()
-    //             .map_err(|_| Error::Unavailable)
-    //             .and_then(|resp| {
-    //                 if let RemoteKeystoreResponse::Sr25519VrfSign(resp) = resp {
-    //                     resp
-    //                 } else {
-    //                     //unreachable!()
-    //                     Err(Error::Unavailable)
-    //                 }
-    //             }),
-    //     }
-    // }
+    fn sr25519_vrf_sign(
+        &self,
+        key_type: KeyTypeId,
+        public: &sr25519::Public,
+        transcript_data: sp_keystore::vrf::VRFTranscriptData,
+    ) -> Result<sp_keystore::vrf::VRFSignature, Error> {
+        match self.conn_tx.send(RemoteKeystore::Sr25519VrfSign {
+            key_type,
+            public: *public,
+            transcript_data,
+        }) {
+            Err(_) => Err(Error::Unavailable),
+            Ok(_) => self
+                .conn_rx
+                .recv()
+                .map_err(|_| Error::Unavailable)
+                .and_then(|resp| {
+                    if let RemoteKeystoreResponse::Sr25519VrfSign(resp) = resp {
+                        resp
+                    } else {
+                        //unreachable!()
+                        Err(Error::Unavailable)
+                    }
+                }),
+        }
+    }
 }
 
 mod sync_cryptostore {
@@ -416,12 +416,12 @@ mod sync_cryptostore {
 
         fn sr25519_vrf_sign(
             &self,
-            _: KeyTypeId,
-            _: &sr25519::Public,
-            _: sp_keystore::vrf::VRFTranscriptData,
+            key_type: KeyTypeId,
+            public: &sr25519::Public,
+            transcript_data: sp_keystore::vrf::VRFTranscriptData,
         ) -> Result<sp_keystore::vrf::VRFSignature, sp_keystore::Error> {
-            // self.sr25519_vrf_sign(key_type, public, transcript_data)
-            Err(Error::Unavailable)
+            self.sr25519_vrf_sign(key_type, public, transcript_data)
+            // Err(Error::Unavailable)
         }
     }
 }
@@ -499,12 +499,12 @@ mod cryptostore {
 
         async fn sr25519_vrf_sign(
             &self,
-            _: KeyTypeId,
-            _: &sr25519::Public,
-            _: sp_keystore::vrf::VRFTranscriptData,
+            key_type: KeyTypeId,
+            public: &sr25519::Public,
+            transcript_data: sp_keystore::vrf::VRFTranscriptData,
         ) -> Result<sp_keystore::vrf::VRFSignature, sp_keystore::Error> {
-            // self.sr25519_vrf_sign(key_type, public, transcript_data)
-            Err(Error::Unavailable)
+            self.sr25519_vrf_sign(key_type, public, transcript_data)
+            // Err(Error::Unavailable)
         }
     }
 }

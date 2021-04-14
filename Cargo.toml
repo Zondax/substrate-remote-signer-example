@@ -28,6 +28,6 @@ ductile = { version = "0.1", path = "vendor/ductile", optional = true }
 serde = "1"
 
 [patch.crates-io]
-sp-core = { path = "../node/primitives/core" }
-sc-keystore = { path = "../node/client/keystore" }
-sp-keystore = { path = "../node/primitives/keystore" }
+sp-core = { git = "https://github.com/Zondax/substrate", branch = "teekeystore" }
+sc-keystore = { git = "https://github.com/Zondax/substrate", branch = "teekeystore" }
+sp-keystore = { git = "https://github.com/Zondax/substrate", branch = "teekeystore" }
